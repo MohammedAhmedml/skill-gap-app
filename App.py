@@ -38,7 +38,7 @@ from google.auth.transport.requests import Request
 st.set_page_config(page_title="Skill Gap Pro Max", layout="wide")
 
 SENDER_EMAIL = "yourgmail@gmail.com"
-SENDER_PASS = "abcdefghijklmop"
+SENDER_PASS = "hzqgqgwqilucvuuq"
 
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
@@ -360,4 +360,5 @@ elif page=="Leaderboard":
 
     df=pd.read_sql_query("SELECT username,streak,total_days FROM users ORDER BY streak DESC",conn)
     st.dataframe(df)
+
 
