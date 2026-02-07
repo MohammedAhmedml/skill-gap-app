@@ -1,36 +1,32 @@
-# =========================================================
-# SKILL GAP ANALYZER PRO MAX
-# Full Hackathon Version (All features included)
-# =========================================================
+# ==========================================================
+# SKILL GAP ANALYZER – CLOUD SAFE VERSION
+# No dotenv • Only st.secrets • Streamlit Cloud ready
+# ==========================================================
 
 import streamlit as st
 import sqlite3
 import hashlib
 import smtplib
 import ssl
-import os
 from email.message import EmailMessage
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
-from dotenv import load_dotenv
 
-# ========================
-# LOAD ENV
-# ========================
-load_dotenv()
-
-EMAIL_USER = os.getenv("EMAIL_USER")
-EMAIL_PASS = os.getenv("EMAIL_PASS")
-
-# ========================
-# PAGE CONFIG
-# ========================
+# ==========================================================
+# PAGE
+# ==========================================================
 st.set_page_config(page_title="Skill Gap Analyzer", layout="wide")
 
-# ========================
+# ==========================================================
+# EMAIL (Cloud safe)
+# ==========================================================
+EMAIL_USER = st.secrets.get("EMAIL_USER")
+EMAIL_PASS = st.secrets.get("EMAIL_PASS")
+
+# ==========================================================
 # DATABASE
-# ========================
+# ==========================================================
 conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
 
@@ -53,42 +49,40 @@ score INTEGER,
 date TEXT
 )
 """)
+
 conn.commit()
 
-# ========================
-# CAREER SKILLS
-# ========================
+# ==========================================================
+# DATA
+# ==========================================================
 CAREER_SKILLS = {
 "Data Scientist": ["Python","SQL","ML","Statistics","Visualization"],
 "Web Developer": ["HTML","CSS","JavaScript","React","Backend"],
-"AI Engineer": ["Python","ML","DL","NLP","Math"]
+"AI Engineer": ["Python","ML","DL","Math"]
 }
 
-# ========================
-# QUIZ QUESTIONS
-# ========================
 QUIZ = {
 "Python":[
-("len([1,2,3]) ?", ["2","3","4","5"], "3"),
-("Keyword for function?", ["fun","define","def","func"], "def"),
-("List symbol?", ["()","{}","[]","<>"], "[]")
+("len([1,2,3]) ?",["2","3","4","5"],"3"),
+("Keyword to define function?",["fun","define","def","func"],"def"),
+("List symbol?",["()","{}","[]","<>"],"[]")
 ],
 "SQL":[
-("SELECT returns?", ["rows","tables","columns","files"], "rows"),
-("Filter keyword?", ["WHERE","WHEN","IF","FILTER"], "WHERE")
+("SELECT returns?",["rows","tables","files","columns"],"rows"),
+("Filter keyword?",["WHERE","WHEN","FILTER","IF"],"WHERE")
 ]
 }
 
-# ========================
+# ==========================================================
 # HELPERS
-# ========================
+# ==========================================================
 
 def hash_pw(p):
     return hashlib.sha256(p.encode()).hexdigest()
 
 def send_email(to_email, subject, body):
     if not EMAIL_USER or not EMAIL_PASS:
-        st.error("Add EMAIL_USER and EMAIL_PASS in .env or secrets")
+        st.error("Email secrets missing in Streamlit settings")
         return
 
     msg = EmailMessage()
@@ -98,52 +92,60 @@ def send_email(to_email, subject, body):
     msg.set_content(body)
 
     context = ssl.create_default_context()
+
     with smtplib.SMTP_SSL("smtp.gmail.com",465,context=context) as server:
         server.login(EMAIL_USER, EMAIL_PASS)
         server.send_message(msg)
 
-def update_streak(u):
+def update_streak(user):
     today = datetime.now().strftime("%Y-%m-%d")
 
-    row = c.execute("SELECT streak,total_days,last_active FROM users WHERE username=?",(u,)).fetchone()
-
-    if not row: return
+    row = c.execute(
+        "SELECT streak,total_days,last_active FROM users WHERE username=?",
+        (user,)
+    ).fetchone()
 
     streak,total,last = row
 
     if last != today:
         streak += 1
         total += 1
-        c.execute("""
-        UPDATE users SET streak=?, total_days=?, last_active=? WHERE username=?
-        """,(streak,total,today,u))
-        conn.commit()
 
-def ai_recommend(goal, gaps):
-    plan = f"""
-🚀 Personalized Plan for {goal}
+    c.execute("""
+    UPDATE users SET streak=?, total_days=?, last_active=? WHERE username=?
+    """,(streak,total,today,user))
 
-You need improvement in:
+    conn.commit()
+
+def ai_recommend(goal,gaps):
+
+    text = f"""
+🚀 Personalized Skill Plan for {goal}
+
+You are currently weak in:
 {", ".join(gaps)}
 
-Step-by-step:
-1. Study basics
-2. Practice daily
-3. Build mini projects
-4. Take free courses
-5. Track progress
+Recommended steps:
 
-Spend 1–2 hours daily.
-Within 30 days you can close these gaps.
+1️⃣ Learn fundamentals  
+2️⃣ Watch tutorials  
+3️⃣ Practice daily coding  
+4️⃣ Build mini projects  
+5️⃣ Track progress  
+
+Daily time: 1–2 hours  
+Expected improvement: 30 days
 """
-    return plan
 
-# ========================
+    return text
+
+# ==========================================================
 # AUTH
-# ========================
+# ==========================================================
+
 def auth():
 
-    tab1, tab2 = st.tabs(["Login","Register"])
+    tab1,tab2 = st.tabs(["Login","Register"])
 
     with tab1:
         u = st.text_input("Username", key="login_u")
@@ -151,10 +153,12 @@ def auth():
 
         if st.button("Login"):
             row = c.execute("SELECT password FROM users WHERE username=?",(u,)).fetchone()
+
             if row and row[0]==hash_pw(p):
                 st.session_state.user = u
-                st.success("Logged in")
                 st.rerun()
+            else:
+                st.error("Invalid login")
 
     with tab2:
         u = st.text_input("Username", key="reg_u")
@@ -165,43 +169,45 @@ def auth():
             c.execute("INSERT OR REPLACE INTO users VALUES(?,?,?,?,?,?)",
                       (u,e,hash_pw(p),0,0,""))
             conn.commit()
-            st.success("Registered")
+            st.success("Registered successfully")
 
-# ========================
-# IF NOT LOGGED
-# ========================
+# ==========================================================
+# NOT LOGGED
+# ==========================================================
 if "user" not in st.session_state:
     auth()
     st.stop()
 
 user = st.session_state.user
 
-# ========================
+# ==========================================================
 # SIDEBAR
-# ========================
-page = st.sidebar.radio("Navigation",
-["Home","Assessment","Dashboard","Leaderboard","Email Reminder"])
+# ==========================================================
+page = st.sidebar.radio(
+"Navigation",
+["Home","Assessment","Dashboard","Leaderboard","Email Reminder"]
+)
 
-# ========================
+# ==========================================================
 # HOME
-# ========================
+# ==========================================================
 if page=="Home":
 
     st.title("🚀 Skill Gap Analyzer")
 
     goals = ["Select your career goal..."] + list(CAREER_SKILLS.keys())
 
-    goal = st.selectbox("Career Goal", goals, index=0)
+    goal = st.selectbox("Choose Career Goal", goals, index=0)
 
     if goal=="Select your career goal...":
         st.stop()
 
     st.session_state.goal = goal
-    st.success("Goal selected!")
+    st.success("Goal selected")
 
-# ========================
+# ==========================================================
 # ASSESSMENT
-# ========================
+# ==========================================================
 if page=="Assessment":
 
     goal = st.session_state.get("goal")
@@ -222,7 +228,6 @@ if page=="Assessment":
 
             for q,opts,ans in QUIZ[skill]:
                 choice = st.radio(q,opts,key=q)
-
                 total+=1
                 if choice==ans:
                     score+=1
@@ -232,57 +237,73 @@ if page=="Assessment":
         percent = int((score/total)*100)
 
         gaps = []
-        if percent < 70:
+        if percent<70:
             gaps = CAREER_SKILLS[goal]
 
         plan = ai_recommend(goal,gaps)
 
-        st.write("Score:",percent,"%")
-        st.write(plan)
+        st.success(f"Score: {percent}%")
+        st.info(plan)
 
         today = datetime.now().strftime("%Y-%m-%d")
+
         c.execute("INSERT INTO progress VALUES(?,?,?,?)",
                   (user,goal,percent,today))
         conn.commit()
 
         update_streak(user)
 
-# ========================
+# ==========================================================
 # DASHBOARD
-# ========================
+# ==========================================================
 if page=="Dashboard":
 
-    df = pd.read_sql_query("SELECT * FROM progress WHERE username=?",conn,params=(user,))
+    df = pd.read_sql_query(
+        "SELECT * FROM progress WHERE username=?",
+        conn,
+        params=(user,)
+    )
 
-    if len(df)==0:
-        st.info("No attempts yet")
-    else:
-        fig = px.line(df,x="date",y="score",title="Progress")
+    if len(df)>0:
+        fig = px.line(df,x="date",y="score",title="Progress Over Time")
         st.plotly_chart(fig,use_container_width=True)
 
-    row = c.execute("SELECT streak,total_days FROM users WHERE username=?",(user,)).fetchone()
+    row = c.execute(
+        "SELECT streak,total_days FROM users WHERE username=?",
+        (user,)
+    ).fetchone()
 
     st.metric("🔥 Streak",row[0])
     st.metric("📅 Total Days",row[1])
 
-# ========================
+# ==========================================================
 # LEADERBOARD
-# ========================
+# ==========================================================
 if page=="Leaderboard":
 
-    df = pd.read_sql_query("SELECT username,streak,total_days FROM users ORDER BY streak DESC",conn)
+    df = pd.read_sql_query(
+        "SELECT username,streak,total_days FROM users ORDER BY streak DESC",
+        conn
+    )
+
     st.dataframe(df)
 
-# ========================
+# ==========================================================
 # EMAIL REMINDER
-# ========================
+# ==========================================================
 if page=="Email Reminder":
 
-    row = c.execute("SELECT email FROM users WHERE username=?",(user,)).fetchone()
-    email = row[0]
+    email = c.execute(
+        "SELECT email FROM users WHERE username=?",
+        (user,)
+    ).fetchone()[0]
 
     st.write("Your email:",email)
 
     if st.button("Send Reminder Now"):
-        send_email(email,"Daily Skill Reminder","Practice today and keep your streak!")
-        st.success("Email sent!")
+        send_email(
+            email,
+            "Daily Skill Reminder",
+            "Practice today and maintain your streak!"
+        )
+        st.success("Reminder sent")
