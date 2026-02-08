@@ -72,23 +72,39 @@ def send_email(email):
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
         server.login(EMAIL_USER, EMAIL_PASS)
         server.send_message(msg)
-
 def update_streak(user):
     row = c.execute(
         "SELECT streak,total_days,last_active FROM users WHERE username=?",
         (user,)
     ).fetchone()
 
-    s,t,last = row
+    # -------- FIX: handle new users safely --------
+    if row is None:
+        # first time user
+        s = 1
+        t = 1
+        last = today()
+
+        c.execute(
+            "UPDATE users SET streak=?, total_days=?, last_active=? WHERE username=?",
+            (s, t, last, user)
+        )
+        conn.commit()
+        return
+    # --------------------------------------------
+
+    s, t, last = row
+
     if last != today():
         s += 1
         t += 1
 
     c.execute(
-        "UPDATE users SET streak=?,total_days=?,last_active=? WHERE username=?",
-        (s,t,today(),user)
+        "UPDATE users SET streak=?, total_days=?, last_active=? WHERE username=?",
+        (s, t, today(), user)
     )
     conn.commit()
+
 
 # ================= QUIZ DATA (10 each) =================
 
@@ -276,4 +292,5 @@ if page == "Email Reminder":
     if st.button("Send Reminder"):
         send_email(email)
         st.success("Reminder sent!")
+
 
