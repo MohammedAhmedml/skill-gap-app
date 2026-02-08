@@ -1,6 +1,10 @@
 # =========================================================
 # SKILL GAP ANALYZER PRO MAX – COMPLETE FINAL VERSION
 # =========================================================
+import os
+
+if os.path.exists("users.db"):
+    os.remove("users.db")   # auto delete old broken database
 
 import streamlit as st
 import sqlite3
@@ -272,3 +276,4 @@ if page == "Email Reminder":
     if st.button("Send Reminder"):
         send_email(email)
         st.success("Reminder sent!")
+
